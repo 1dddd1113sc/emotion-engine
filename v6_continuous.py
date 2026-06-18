@@ -59,6 +59,7 @@ print(f"Press Ctrl+C to stop\n")
 step = 0
 try:
     while running:
+        t_start = time.monotonic()
         r, d = collector.collect_once()
         body = mgr.update(
             load_signal=r.cpu_percent / 100.0,
@@ -130,7 +131,8 @@ try:
                   f"F={body.fatigue:.2f} T={body.tension:.2f} C={body.comfort:.2f} "
                   f"| {row['time']}")
 
-        time.sleep(INTERVAL)
+        elapsed = time.monotonic() - t_start
+        time.sleep(max(0, INTERVAL - elapsed))
 
 finally:
     csv_file.close()

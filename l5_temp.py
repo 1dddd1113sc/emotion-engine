@@ -1,10 +1,14 @@
 """L5 温度采集 — 通过 LibreHardwareMonitor DLL 直连"""
 import sys
+import time
 
 _LHM_DIR = r'C:\Users\Daniel Wu\AppData\Local\Microsoft\WinGet\Packages\LibreHardwareMonitor.LibreHardwareMonitor_Microsoft.Winget.Source_8wekyb3d8bbwe'
 
 _initialized = False
 _computer = None
+_cache = None
+_cache_time = 0
+_cache_ttl = 5.0  # 5 秒缓存
 
 
 def _init():
@@ -29,13 +33,13 @@ def _init():
 
 def read_temperatures() -> dict:
     """
-    读取温度数据。
-    返回: {
-        'cpu_temp': float|None,      # CPU 温度 (°C)，非管理员返回 None
-        'gpu_temp': float|None,      # GPU 核心温度 (°C)
-        'gpu_hotspot': float|None,   # GPU 热点温度 (°C)
-    }
+    读取温度数据（带 5 秒缓存）。
     """
+    global _cache, _cache_time
+    now = time.time()
+    if _cache and (now - _cache_time) < _cache_ttl:
+        return _cache
+
     _init()
     if not _computer:
         return {'cpu_temp': None, 'gpu_temp': None, 'gpu_hotspot': None}
@@ -78,6 +82,8 @@ def read_temperatures() -> dict:
                         if ('tdie' in name or 'tctl' in name or 'package' in name) and val > 0:
                             result['cpu_temp'] = val
 
+        _cache = result
+        _cache_time = now
         return result
     except Exception:
         return {'cpu_temp': None, 'gpu_temp': None, 'gpu_hotspot': None}

@@ -272,17 +272,23 @@ class RealMetricCollector:
             raw.thread_count = psutil.os.sysconf('SC_THREAD_THREADS_MAX') if hasattr(psutil.os, 'sysconf') else 0
         except Exception:
             pass
-        # 用进程遍历统计线程（更可靠）
-        try:
-            total_threads = 0
-            for p in psutil.process_iter(['num_threads']):
-                try:
-                    total_threads += p.info.get('num_threads', 0) or 0
-                except Exception:
-                    pass
-            raw.thread_count = total_threads
-        except Exception:
-            pass
+        # 线程数：缓存 10 秒（遍历进程很慢 ~3.7s）
+        now_ts = time.time()
+        if not hasattr(self, '_thread_cache') or now_ts - self._thread_cache_time > 10:
+            try:
+                total_threads = 0
+                for p in psutil.process_iter(['num_threads']):
+                    try:
+                        total_threads += p.info.get('num_threads', 0) or 0
+                    except Exception:
+                        pass
+                raw.thread_count = total_threads
+                self._thread_cache = total_threads
+                self._thread_cache_time = now_ts
+            except Exception:
+                pass
+        else:
+            raw.thread_count = self._thread_cache if hasattr(self, '_thread_cache') else 0
 
         # ===== L3 传导与IO层 =====
         try:

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Data (large files, don't commit)
+data/google_metrics_cache.json
+data/google_2011.json
+data/google_2019_p*.json
+data/ae_train_data.npy
+data/ae_stats.json
+
+# Test outputs
+v6_live_data.csv
+v6_test_data.csv
+v6_test_summary.json
+stress_10min_results.json
+stress_test_results.json
+test_results_1000.json
+ema_train_results.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini

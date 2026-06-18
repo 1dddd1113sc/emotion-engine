@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>V6 五层感官 - 实测报告</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 20px; }
+  h1 { color: #00d4ff; text-align: center; margin-bottom: 5px; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+  .card { background: #16213e; border-radius: 12px; padding: 20px; border-left: 4px solid #00d4ff; }
+  .card.l1 { border-left-color: #ff6b6b; }
+  .card.l2 { border-left-color: #ffa502; }
+  .card.l3 { border-left-color: #2ed573; }
+  .card.l4 { border-left-color: #a855f7; }
+  .card.l5 { border-left-color: #ff4757; }
+  .card.body { border-left-color: #00d4ff; grid-column: span 2; }
+  .card h2 { margin: 0 0 15px 0; font-size: 16px; }
+  .card.l1 h2 { color: #ff6b6b; }
+  .card.l2 h2 { color: #ffa502; }
+  .card.l3 h2 { color: #2ed573; }
+  .card.l4 h2 { color: #a855f7; }
+  .card.l5 h2 { color: #ff4757; }
+  .card.body h2 { color: #00d4ff; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 6px 10px; border-bottom: 1px solid #233; }
+  td:first-child { color: #888; width: 50%; }
+  td:last-child { text-align: right; font-family: 'Consolas', monospace; color: #fff; }
+  .bar { display: inline-block; height: 8px; border-radius: 4px; margin-right: 8px; vertical-align: middle; }
+  .bar.green { background: #2ed573; }
+  .bar.yellow { background: #ffa502; }
+  .bar.red { background: #ff4757; }
+  .status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+  .status.ok { background: #2ed573; color: #000; }
+  .status.warn { background: #ffa502; color: #000; }
+  .status.na { background: #555; color: #aaa; }
+  .emotion { text-align: center; padding: 30px; }
+  .emotion .face { font-size: 60px; }
+  .emotion .label { font-size: 24px; color: #00d4ff; margin: 10px 0; }
+  .emotion .dims { display: flex; justify-content: center; gap: 30px; margin-top: 15px; }
+  .emotion .dim { text-align: center; }
+  .emotion .dim .val { font-size: 28px; font-weight: bold; }
+  .emotion .dim .name { font-size: 12px; color: #888; }
+  .footer { text-align: center; color: #555; margin-top: 30px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>V6 五层感官 - 实测报告</h1>
+<p class="subtitle">DESKTOP-CLQKF6A | 2026-06-18 15:16 | 30秒 x 1Hz采样</p>
+
+<div class="grid">
+
+  <div class="card body">
+    <h2>情绪状态</h2>
+    <div class="emotion">
+      <div class="face">😌</div>
+      <div class="label">稳态良好</div>
+      <div class="dims">
+        <div class="dim"><div class="val" style="color:#2ed573">0.349</div><div class="name">疲劳 Fatigue</div></div>
+        <div class="dim"><div class="val" style="color:#ffa502">0.149</div><div class="name">紧绷 Tension</div></div>
+        <div class="dim"><div class="val" style="color:#2ed573">0.909</div><div class="name">舒适 Comfort</div></div>
+        <div class="dim"><div class="val" style="color:#2ed573">0.052</div><div class="name">耗竭 Exhaustion</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card l1">
+    <h2>L1 计算与记忆层 → Fatigue</h2>
+    <table>
+      <tr><td>CPU 使用率 (平均)</td><td><span class="bar green" style="width:15px"></span>14.6%</td></tr>
+      <tr><td>CPU 使用率 (峰值)</td><td><span class="bar green" style="width:19px"></span>19.2%</td></tr>
+      <tr><td>内存使用率</td><td><span class="bar green" style="width:44px"></span>43.5%</td></tr>
+      <tr><td>可用内存</td><td>18.2 GB</td></tr>
+      <tr><td>Swap 使用率</td><td><span class="bar green" style="width:14px"></span>13.9%</td></tr>
+      <tr><td>CPU 频率</td><td>3501 MHz (100%)</td></tr>
+      <tr><td>降频惩罚</td><td><span class="status ok">0.000 满速</span></td></tr>
+      <tr><td>CPU 过劳度</td><td><span class="status ok">0.000</span></td></tr>
+      <tr><td>内存压力</td><td><span class="status ok">0.000</span></td></tr>
+      <tr><td>上下文切换率</td><td>~14,000/s</td></tr>
+      <tr><td>系统调用率</td><td>~1,200,000/s</td></tr>
+    </table>
+  </div>
+
+  <div class="card l2">
+    <h2>L2 吞吐与排队层 → Stress</h2>
+    <table>
+      <tr><td>总连接数 (平均)</td><td>166</td></tr>
+      <tr><td>总连接数 (峰值)</td><td>173</td></tr>
+      <tr><td>ESTABLISHED</td><td>~33</td></tr>
+      <tr><td>LISTEN</td><td>~45</td></tr>
+      <tr><td>TIME_WAIT</td><td>~12</td></tr>
+      <tr><td>CLOSE_WAIT (平均)</td><td><span class="bar yellow" style="width:23px"></span>23</td></tr>
+      <tr><td>CLOSE_WAIT 比率</td><td><span class="status warn">0.143</span></td></tr>
+      <tr><td>监听积压比</td><td><span class="status ok">0.273</span></td></tr>
+      <tr><td>系统线程数</td><td>~4,604</td></tr>
+      <tr><td>线程密度</td><td>19.3</td></tr>
+    </table>
+  </div>
+
+  <div class="card l3">
+    <h2>L3 传导与IO层 → Stress + Flow</h2>
+    <table>
+      <tr><td>磁盘IO延迟 (平均)</td><td><span class="status ok">0.00 ms</span></td></tr>
+      <tr><td>磁盘IO延迟 (峰值)</td><td>0.00 ms</td></tr>
+      <tr><td>磁盘队列深度</td><td><span class="status ok">0</span></td></tr>
+      <tr><td>读 IOPS</td><td>~0</td></tr>
+      <tr><td>写 IOPS</td><td>~5</td></tr>
+      <tr><td>磁盘吞吐</td><td>0.06 MB/s</td></tr>
+      <tr><td>网络吞吐</td><td>0.01 MB/s</td></tr>
+      <tr><td>网络错误率</td><td><span class="status ok">0.000%</span></td></tr>
+      <tr><td>C盘使用率</td><td><span class="bar yellow" style="width:77px"></span>76.9%</td></tr>
+      <tr><td>D盘使用率</td><td><span class="bar green" style="width:47px"></span>47.3%</td></tr>
+    </table>
+  </div>
+
+  <div class="card l4">
+    <h2>L4 业务表现层 → Flow / Confusion</h2>
+    <table>
+      <tr><td>服务状态</td><td><span class="status na">未运行</span></td></tr>
+      <tr><td>错误率</td><td>N/A</td></tr>
+      <tr><td>5xx 错误率</td><td>N/A</td></tr>
+      <tr><td>P99 延迟</td><td>N/A</td></tr>
+      <tr><td>吞吐 (RPS)</td><td>N/A</td></tr>
+      <tr><td>健康评分</td><td><span class="status ok">1.000</span></td></tr>
+      <tr><td colspan="2" style="color:#888;font-size:12px;padding-top:10px">需要启动 HTTP 服务 + l4_proxy 或直接埋点</td></tr>
+    </table>
+  </div>
+
+  <div class="card l5">
+    <h2>L5 物理硬件层 → 终极 Fatigue</h2>
+    <table>
+      <tr><td>CPU 温度</td><td><span class="status na">WMI 不可用</span></td></tr>
+      <tr><td>GPU 温度 (平均)</td><td><span class="status ok">38.0 °C</span></td></tr>
+      <tr><td>GPU 温度 (峰值)</td><td>38.0 °C</td></tr>
+      <tr><td>GPU 使用率</td><td><span class="status ok">0%</span></td></tr>
+      <tr><td>GPU 显存</td><td>1835 / 8188 MB</td></tr>
+      <tr><td>温度压力</td><td><span class="status ok">0.000</span></td></tr>
+      <tr><td>GPU 压力</td><td><span class="status ok">0.000</span></td></tr>
+      <tr><td>磁盘队列</td><td><span class="status ok">0</span></td></tr>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer">
+  Emotion Engine V6 | 五层感官架构 | 87 指标 (45 可用 / 13 None / 29 派生)
+</div>
+
+</body>
+</html>

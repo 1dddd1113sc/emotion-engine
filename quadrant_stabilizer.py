@@ -24,29 +24,29 @@ class QuadrantStabilizer:
         deadzone_p: float = 0.06,
         deadzone_a: float = 0.06,
         deadzone_d: float = 0.06,
-        # 象限滞回：离开当前象限需要越过的阈值
-        hysteresis: float = 0.08,
         # 惯性窗口：连续 N 次指向同一新象限才确认切换
         inertia_window: int = 3,
-        # 震荡检测窗口
-        oscillation_window: int = 8,
-        # 震荡抑制强度 (0=不抑制, 1=完全锁定)
-        oscillation_suppress: float = 0.7,
+        # 上下文自适应参数
+        clean_dz: float = 0.12,       # clean 时放大的死区
+        clean_inertia: int = 8,       # clean 时更高的惯性
+        err_dz: float = 0.04,         # err 时缩小的死区
+        err_inertia: int = 3,         # err 时的惯性
     ):
         self.deadzone = {'P': deadzone_p, 'A': deadzone_a, 'D': deadzone_d}
-        self.hysteresis = hysteresis
         self.inertia_window = inertia_window
-        self.oscillation_window = oscillation_window
-        self.oscillation_suppress = oscillation_suppress
+        # 上下文自适应
+        self.clean_dz = clean_dz
+        self.clean_inertia = clean_inertia
+        self.err_dz = err_dz
+        self.err_inertia = err_inertia
 
         # 状态
         self.current_quadrant = None       # 当前稳定象限 (p_bit, a_bit, d_bit)
         self._prev_signs = {'P': 0, 'A': 0, 'D': 0}
-        self._candidate_history = deque(maxlen=inertia_window)
-        self._raw_history = {'P': deque(maxlen=oscillation_window),
-                             'A': deque(maxlen=oscillation_window),
-                             'D': deque(maxlen=oscillation_window)}
-        self._baseline = {'P': 0.0, 'A': 0.0, 'D': 0.0}  # 上一个稳定值
+        self._candidate_history = deque(maxlen=max(clean_inertia, inertia_window) + 2)
+        self._raw_history = {'P': deque(maxlen=8), 'A': deque(maxlen=8), 'D': deque(maxlen=8)}
+        self._baseline = {'P': 0.0, 'A': 0.0, 'D': 0.0}
+        self._current_context = 'clean'
 
     def reset(self):
         self.current_quadrant = None
@@ -56,87 +56,74 @@ class QuadrantStabilizer:
             h.clear()
         self._baseline = {'P': 0.0, 'A': 0.0, 'D': 0.0}
 
-    def update(self, P: float, A: float, D: float) -> tuple[float, float, float, tuple, bool]:
+    def update(self, P: float, A: float, D: float, context: str = 'clean') -> tuple[float, float, float, tuple, bool]:
         """
-        输入: EMA 平滑后的 P/A/D 值
+        输入: EMA 平滑后的 P/A/D 值, 上下文标签
         输出: (P_stable, A_stable, D_stable, quadrant, is_transition)
         """
+        self._current_context = context
+
+        # ── 上下文自适应参数 ──
+        if context == 'clean':
+            dz = self.clean_dz
+            inertia = self.clean_inertia
+        else:  # err / degraded
+            dz = self.err_dz
+            inertia = self.err_inertia
+
         # ── Layer 1: 震荡检测与抑制 ──
         for dim, val in [('P', P), ('A', A), ('D', D)]:
             self._raw_history[dim].append(val)
         P, A, D = self._suppress_oscillation(P, A, D)
 
-        # ── Layer 2: 维度死区 ──
-        P = self._apply_deadzone(P, 'P')
-        A = self._apply_deadzone(A, 'A')
-        D = self._apply_deadzone(D, 'D')
-
-        # ── Layer 3: 象限滞回 ──
-        P_s = self._apply_hysteresis(P, 'P')
-        A_s = self._apply_hysteresis(A, 'A')
-        D_s = self._apply_hysteresis(D, 'D')
+        # ── Layer 2: 维度死区（上下文自适应）──
+        P = self._apply_deadzone_ctx(P, 'P', dz)
+        A = self._apply_deadzone_ctx(A, 'A', dz)
+        D = self._apply_deadzone_ctx(D, 'D', dz)
 
         # 候选象限
-        candidate = self._to_quadrant(P_s, A_s, D_s)
+        candidate = self._to_quadrant(P, A, D)
 
         # 首次初始化
         if self.current_quadrant is None:
             self.current_quadrant = candidate
             self._update_baseline(P, A, D)
-            return P_s, A_s, D_s, candidate, False
+            return P, A, D, candidate, False
 
         # 象限未变
         if candidate == self.current_quadrant:
+            self._candidate_history.clear()
             self._update_baseline(P, A, D)
-            return P_s, A_s, D_s, candidate, False
+            return P, A, D, candidate, False
 
-        # ── Layer 4: 惯性窗口 ──
+        # ── Layer 3: 连续 N 次一致才切换 ──
         self._candidate_history.append(candidate)
 
-        if len(self._candidate_history) >= self.inertia_window:
-            # 检查最近 N 次是否全部指向同一个新象限
+        if len(self._candidate_history) >= inertia:
             recent = list(self._candidate_history)
-            if all(q == candidate for q in recent[-self.inertia_window:]):
-                # 确认切换
-                old = self.current_quadrant
+            if all(q == candidate for q in recent[-inertia:]):
                 self.current_quadrant = candidate
                 self._candidate_history.clear()
                 self._update_baseline(P, A, D)
-                return P_s, A_s, D_s, candidate, True
+                return P, A, D, candidate, True
 
         # 未满足条件，锁定在当前象限
-        P_s, A_s, D_s = self._snap_to_quadrant(P_s, A_s, D_s)
-        return P_s, A_s, D_s, self.current_quadrant, False
+        P, A, D = self._snap_to_quadrant(P, A, D)
+        return P, A, D, self.current_quadrant, False
 
     # ── 内部方法 ──
 
     def _apply_deadzone(self, value: float, dim: str) -> float:
         """维度死区：在 [-dz, +dz] 内归零"""
         dz = self.deadzone[dim]
+        return self._apply_deadzone_ctx(value, dim, dz)
+
+    def _apply_deadzone_ctx(self, value: float, dim: str, dz: float) -> float:
+        """上下文自适应维度死区"""
         if abs(value) < dz:
             return 0.0
         sign = 1.0 if value > 0 else -1.0
         return sign * (abs(value) - dz) / (1.0 - dz)
-
-    def _apply_hysteresis(self, value: float, dim: str) -> float:
-        """象限滞回：当前正区间时，值必须 < -hysteresis 才翻负"""
-        h = self.hysteresis
-        prev = self._prev_signs[dim]
-
-        if prev >= 0:
-            if value < -h:
-                self._prev_signs[dim] = -1
-                return value
-            else:
-                self._prev_signs[dim] = 1
-                return max(value, 0.0) if prev > 0 else value
-        else:
-            if value > h:
-                self._prev_signs[dim] = 1
-                return value
-            else:
-                self._prev_signs[dim] = -1
-                return min(value, 0.0) if prev < 0 else value
 
     def _suppress_oscillation(self, P: float, A: float, D: float) -> tuple[float, float, float]:
         """震荡检测：短时内方向反复反转 → 抑制"""
@@ -167,14 +154,15 @@ class QuadrantStabilizer:
     def _snap_to_quadrant(self, P: float, A: float, D: float) -> tuple[float, float, float]:
         """将接近 0 的值吸附到当前象限内侧"""
         q = self.current_quadrant
+        dz = self.clean_dz if self._current_context == 'clean' else self.err_dz
         dims = [('P', P, q[0]), ('A', A, q[1]), ('D', D, q[2])]
         result = []
         for name, val, sign_bit in dims:
             target_sign = 1 if sign_bit else -1
             if target_sign > 0 and val < 0:
-                result.append(max(val, -self.deadzone[name]))
+                result.append(max(val, -dz))
             elif target_sign < 0 and val > 0:
-                result.append(min(val, self.deadzone[name]))
+                result.append(min(val, dz))
             else:
                 result.append(val)
         return tuple(result)

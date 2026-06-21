@@ -3,7 +3,7 @@
 > 用拟人化的情绪维度（愉悦度 P / 唤醒度 A / 支配度 D）实时刻画系统健康状态，
 > 让运维人员像"读懂一个人"一样读懂机器。基于 Mehrabian PAD 三维情绪模型。
 
-**版本：V6.2** ｜ **更新：2026-06-19** ｜ **状态：核心管线已修复，cross_validate / final_validation 脚本待适配**
+**版本：V6.3** ｜ **更新：2026-06-21** ｜ **状态：核心管线已修复，项目结构整理完成**
 
 ---
 
@@ -159,6 +159,10 @@ python v6_continuous.py
 
 # 数据集审计
 python data_audit.py
+
+# 运行 scripts/ 或 tests/ 下的脚本（需从项目根目录执行）
+PYTHONPATH=. python scripts/demo_extreme.py
+PYTHONPATH=. python tests/test_full_pipeline.py
 ```
 
 > `cross_validate.py` 与 `final_validation.py` 当前因 Stabilizer API 变更失效，运行会报 `TypeError: __init__() got an unexpected keyword argument 'hysteresis'`。
@@ -167,7 +171,12 @@ python data_audit.py
 
 ## 变更记录
 
-### V6.2 — 2026-06-19（本次）
+### V6.3 — 2026-06-21（本次）
+- **项目整理**：临时调试脚本移至 ，测试脚本移至 ，根目录从 ~80 文件精简至 ~40 文件。
+- 删除误创建的  文件夹。
+- 更新版本号至 V6.3。
+
+### V6.2 — 2026-06-19
 - **修复 P0**：`quadrant_stabilizer.py` 新增 `oscillation_suppress` 属性，震荡检测不再崩溃。
 - **修复 P0**：`template_engine.py` 裸 `except:` 改为具体异常类型。
 - **修复 P1**：`ema_filter.py` 默认参数改为 V6 训练值 `(0.35, 0.60)`。

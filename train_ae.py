@@ -8,13 +8,14 @@ AutoEncoder 训练脚本
 2. 训练AutoEncoder
 3. 保存模型和统计参数
 """
+import os
 import sys, io, os, json, time
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import numpy as np
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
-MODEL_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\models"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ============================================================

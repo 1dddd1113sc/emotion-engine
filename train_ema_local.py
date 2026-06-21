@@ -1,14 +1,15 @@
 """EMA 训练 — 用本机实时采集数据"""
+import os
 import sys, io, csv, json, time, itertools
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pad_model import MetricsHistory, metrics_to_pad
 from ode_dynamics import ODEDynamics, ODEConfig
 from ema_filter import AdaptiveEMAFilter
 
 # 加载本机实时数据
-CSV = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
+CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
 with open(CSV, encoding='utf-8-sig') as f:
     rows = list(csv.DictReader(f))
 

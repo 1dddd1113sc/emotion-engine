@@ -1,7 +1,8 @@
 """新架构参数调优 — 本机 + Google 交叉验证"""
+import os
 import sys, io, csv, json, itertools
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from context_pad import PADOutput, compose_pad, extract_signals
 from semantic_signals import SemanticSignals
@@ -9,8 +10,8 @@ from ema_filter import AdaptiveEMAFilter
 from quadrant_stabilizer import QuadrantStabilizer
 from pad_model import PADState
 
-LOCAL = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
-GOOGLE = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data\google_metrics_cache.json'
+LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
+GOOGLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/google_metrics_cache.json')
 
 with open(LOCAL, encoding='utf-8-sig') as f:
     local = [(float(r['cpu_pct']), float(r['mem_pct'])) for r in csv.DictReader(f)]
@@ -20,8 +21,10 @@ with open(GOOGLE) as f:
 def evaluate(data, p_base_k, p_base_b, a_base_k, stab_dz, stab_hyst, stab_inertia):
     """用指定参数评估闪烁率"""
     ema = AdaptiveEMAFilter(alpha_slow=0.35, alpha_fast=0.60, beta=12.0, inertia=0.20)
+    # V6.2: hysteresis 已移除，改用上下文自适应参数
     stab = QuadrantStabilizer(deadzone_p=stab_dz, deadzone_a=stab_dz, deadzone_d=stab_dz,
-                               hysteresis=stab_hyst, inertia_window=stab_inertia)
+                               clean_dz=stab_hyst, err_dz=stab_dz,
+                               clean_inertia=stab_inertia * 2, err_inertia=stab_inertia)
     states = []
     for cpu, mem in data:
         err = max(0, (cpu - 60) / 40 * 15) if cpu > 60 else max(0, cpu / 30 * 0.5)

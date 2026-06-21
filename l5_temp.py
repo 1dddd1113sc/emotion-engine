@@ -60,7 +60,7 @@ def read_temperatures() -> dict:
                     # CPU 温度
                     if 'cpu' in hw_name or 'ryzen' in hw_name or 'intel' in hw_name:
                         if 'tdie' in name or 'tctl' in name or 'package' in name:
-                            if val > 0:  # 0°C 通常是无效值
+                            if val > 0:  # 0°C 通常是无效值（AMD 需要管理员权限）
                                 result['cpu_temp'] = val
                         elif result['cpu_temp'] is None and val > 0:
                             result['cpu_temp'] = val
@@ -81,6 +81,10 @@ def read_temperatures() -> dict:
                         name = sensor.Name.lower()
                         if ('tdie' in name or 'tctl' in name or 'package' in name) and val > 0:
                             result['cpu_temp'] = val
+
+        # 如果没有 CPU 温度但有 GPU 温度，用 GPU 温度估算（GPU 通常比 CPU 高 5-10°C）
+        if result['cpu_temp'] is None and result['gpu_temp'] is not None:
+            result['cpu_temp'] = result['gpu_temp'] - 5.0
 
         _cache = result
         _cache_time = now

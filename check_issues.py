@@ -1,7 +1,8 @@
 """Quick issue check"""
+import os
 import csv
 
-CSV = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
+CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
 with open(CSV, encoding='utf-8-sig') as f:
     rows = list(csv.DictReader(f))
 

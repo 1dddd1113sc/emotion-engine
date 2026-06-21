@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>V6.2 实时体感仪表盘</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 1200px; margin: 0 auto; }
+  .card { background: #14141f; border: 1px solid #1e1e30; border-radius: 12px; padding: 20px; }
+  .card.full { grid-column: 1 / -1; }
+  .card.half { grid-column: span 2; }
+  .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .value { font-size: 36px; font-weight: 700; }
+  .sub { font-size: 13px; color: #888; margin-top: 2px; }
+  .bar-bg { background: #1a1a2e; border-radius: 6px; height: 12px; margin-top: 8px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 6px; transition: width 0.3s; }
+  .bar.fatigue { background: linear-gradient(90deg, #4ade80, #facc15, #ef4444); }
+  .bar.tension { background: linear-gradient(90deg, #60a5fa, #c084fc, #f472b6); }
+  .bar.comfort { background: linear-gradient(90deg, #f87171, #fbbf24, #34d399); }
+  .bar.sig { background: linear-gradient(90deg, #818cf8, #a78bfa); }
+  .row { display: flex; gap: 12px; align-items: center; }
+  .row.between { justify-content: space-between; }
+  .corr { font-size: 14px; padding: 4px 10px; border-radius: 6px; }
+  .corr.pos { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .corr.neg { background: rgba(248,113,113,0.15); color: #f87171; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+  .tag.ok { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .tag.warn { background: rgba(250,204,21,0.15); color: #facc15; }
+  .tag.bad { background: rgba(248,113,113,0.15); color: #f87171; }
+  h2 { font-size: 16px; margin-bottom: 12px; color: #aaa; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mini { font-size: 13px; }
+  .mini .bar-bg { height: 8px; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="card">
+    <div class="label">CPU 使用率</div>
+    <div class="value" style="color:#60a5fa">25.0<span style="font-size:20px">%</span></div>
+    <div class="sub">范围 1.7 ~ 76.7% | Std 18.0</div>
+    <div class="bar-bg"><div class="bar tension" style="width:25%"></div></div>
+  </div>
+  <div class="card">
+    <div class="label">CPU-Fatigue 相关</div>
+    <div class="value" style="color:#4ade80">+0.708</div>
+    <div class="sub">强正相关 ✅</div>
+    <span class="tag ok">健康</span>
+  </div>
+  <div class="card">
+    <div class="label">CPU-Comfort 相关</div>
+    <div class="value" style="color:#f87171">-0.830</div>
+    <div class="sub">强负相关 ✅</div>
+    <span class="tag ok">符合预期</span>
+  </div>
+
+  <div class="card">
+    <div class="label">疲劳度 Fatigue</div>
+    <div class="value" style="color:#facc15">0.636</div>
+    <div class="sub">范围 0.423 ~ 0.858 | Range 0.435</div>
+    <div class="bar-bg"><div class="bar fatigue" style="width:63.6%"></div></div>
+  </div>
+  <div class="card">
+    <div class="label">紧绷度 Tension</div>
+    <div class="value" style="color:#c084fc">0.252</div>
+    <div class="sub">范围 0.000 ~ 0.386 | Range 0.386</div>
+    <div class="bar-bg"><div class="bar tension" style="width:25.2%"></div></div>
+  </div>
+  <div class="card">
+    <div class="label">舒适度 Comfort</div>
+    <div class="value" style="color:#34d399">0.756</div>
+    <div class="sub">范围 0.701 ~ 0.785 | Range 0.084</div>
+    <div class="bar-bg"><div class="bar comfort" style="width:75.6%"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">cpu_overwork</div>
+    <div class="value" style="color:#f87171">0.012</div>
+    <div class="sub">Max 0.292 | 平均 CPU 低，过劳低</div>
+  </div>
+  <div class="card">
+    <div class="label">health_score</div>
+    <div class="value" style="color:#4ade80">0.961</div>
+    <div class="sub">范围 0.666 ~ 1.000</div>
+  </div>
+  <div class="card">
+    <div class="label">CPU / GPU 温度</div>
+    <div class="value" style="font-size:24px;color:#fb923c">48.4°C / 53.5°C</div>
+    <div class="sub">范围 44~53 / 49~58</div>
+  </div>
+
+  <div class="card full">
+    <h2>相关性矩阵</h2>
+    <div class="grid-2">
+      <div>
+        <div class="row between"><span>CPU → Fatigue</span><span class="corr pos">+0.708</span></div>
+        <div class="bar-bg" style="height:8px"><div class="bar fatigue" style="width:70.8%"></div></div>
+      </div>
+      <div>
+        <div class="row between"><span>CPU → Comfort</span><span class="corr neg">-0.830</span></div>
+        <div class="bar-bg" style="height:8px"><div class="bar comfort" style="width:83%"></div></div>
+      </div>
+      <div>
+        <div class="row between"><span>Fatigue → Comfort</span><span class="corr neg">-0.947</span></div>
+        <div class="bar-bg" style="height:8px"><div class="bar comfort" style="width:94.7%"></div></div>
+      </div>
+      <div>
+        <div class="row between"><span>CPU → Tension</span><span class="corr pos">+0.271</span></div>
+        <div class="bar-bg" style="height:8px"><div class="bar tension" style="width:27.1%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card full">
+    <h2>修复前后对比</h2>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">
+      <tr style="color:#666">
+        <th style="text-align:left;padding:4px">指标</th>
+        <th style="text-align:right;padding:4px">修复前</th>
+        <th style="text-align:right;padding:4px">修复后</th>
+        <th style="text-align:right;padding:4px">改善</th>
+      </tr>
+      <tr><td style="padding:4px">fatigue range</td><td style="text-align:right;color:#f87171">0.014</td><td style="text-align:right;color:#4ade80">0.435</td><td style="text-align:right;color:#4ade80">31x</td></tr>
+      <tr><td style="padding:4px">comfort range</td><td style="text-align:right;color:#f87171">0.000</td><td style="text-align:right;color:#4ade80">0.084</td><td style="text-align:right;color:#4ade80">∞</td></tr>
+      <tr><td style="padding:4px">CPU-Fatigue 相关</td><td style="text-align:right;color:#f87171">+0.242</td><td style="text-align:right;color:#4ade80">+0.708</td><td style="text-align:right;color:#4ade80">3x</td></tr>
+      <tr><td style="padding:4px">health_score</td><td style="text-align:right;color:#f87171">恒为 1.0</td><td style="text-align:right;color:#4ade80">0.67~1.0</td><td style="text-align:right;color:#4ade80">✅</td></tr>
+      <tr><td style="padding:4px">cpu_overwork</td><td style="text-align:right;color:#f87171">未记录</td><td style="text-align:right;color:#4ade80">0~0.29</td><td style="text-align:right;color:#4ade80">✅</td></tr>
+      <tr><td style="padding:4px">cpu_temp</td><td style="text-align:right;color:#f87171">-1</td><td style="text-align:right;color:#4ade80">44~53°C</td><td style="text-align:right;color:#4ade80">✅</td></tr>
+    </table>
+  </div>
+</div>
+</body>
+</html>

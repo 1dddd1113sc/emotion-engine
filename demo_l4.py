@@ -7,9 +7,10 @@ L4 端到端验证 — 模拟服务 + 采集器
 
 运行：python demo_l4.py
 """
+import os
 import sys, io, time, threading
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def start_mock_service(port=9100):

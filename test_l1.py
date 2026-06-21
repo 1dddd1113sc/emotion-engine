@@ -1,7 +1,8 @@
 """L1 指标验证"""
+import os
 import sys, io, time
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import psutil
 psutil.cpu_percent(interval=0)
 from real_collector import RealMetricCollector, format_metrics

@@ -1,0 +1,169 @@
+{
+  "data_source": "Google Cluster Data 2019",
+  "data_rows": 50000,
+  "total_combos": 720,
+  "best_params": {
+    "alpha_slow": 0.3,
+    "alpha_fast": 0.5,
+    "beta": 12.0,
+    "inertia": 0.1
+  },
+  "best_metrics": {
+    "flicker_rate": 0.4808,
+    "response_latency": 0.68,
+    "stability": 0.7012,
+    "score": 48.99
+  },
+  "top_15": [
+    {
+      "alpha_slow": 0.3,
+      "alpha_fast": 0.5,
+      "beta": 12.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4808,
+      "response_latency": 0.68,
+      "stability": 0.7012,
+      "score": 48.99
+    },
+    {
+      "alpha_slow": 0.35,
+      "alpha_fast": 0.5,
+      "beta": 8.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4811,
+      "response_latency": 0.68,
+      "stability": 0.7011,
+      "score": 48.99
+    },
+    {
+      "alpha_slow": 0.3,
+      "alpha_fast": 0.5,
+      "beta": 8.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4786,
+      "response_latency": 0.69,
+      "stability": 0.7023,
+      "score": 48.98
+    },
+    {
+      "alpha_slow": 0.35,
+      "alpha_fast": 0.5,
+      "beta": 12.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4826,
+      "response_latency": 0.67,
+      "stability": 0.7,
+      "score": 48.98
+    },
+    {
+      "alpha_slow": 0.25,
+      "alpha_fast": 0.5,
+      "beta": 12.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4789,
+      "response_latency": 0.69,
+      "stability": 0.7017,
+      "score": 48.97
+    },
+    {
+      "alpha_slow": 0.35,
+      "alpha_fast": 0.5,
+      "beta": 5.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4785,
+      "response_latency": 0.69,
+      "stability": 0.7019,
+      "score": 48.97
+    },
+    {
+      "alpha_slow": 0.3,
+      "alpha_fast": 0.6,
+      "beta": 12.0,
+      "inertia": 0.2,
+      "flicker_rate": 0.4898,
+      "response_latency": 0.65,
+      "stability": 0.6961,
+      "score": 48.93
+    },
+    {
+      "alpha_slow": 0.35,
+      "alpha_fast": 0.6,
+      "beta": 12.0,
+      "inertia": 0.2,
+      "flicker_rate": 0.4912,
+      "response_latency": 0.65,
+      "stability": 0.6954,
+      "score": 48.93
+    },
+    {
+      "alpha_slow": 0.2,
+      "alpha_fast": 0.5,
+      "beta": 12.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4766,
+      "response_latency": 0.71,
+      "stability": 0.7017,
+      "score": 48.92
+    },
+    {
+      "alpha_slow": 0.25,
+      "alpha_fast": 0.6,
+      "beta": 12.0,
+      "inertia": 0.2,
+      "flicker_rate": 0.4884,
+      "response_latency": 0.66,
+      "stability": 0.6963,
+      "score": 48.92
+    },
+    {
+      "alpha_slow": 0.3,
+      "alpha_fast": 0.5,
+      "beta": 5.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4749,
+      "response_latency": 0.71,
+      "stability": 0.7023,
+      "score": 48.92
+    },
+    {
+      "alpha_slow": 0.35,
+      "alpha_fast": 0.6,
+      "beta": 8.0,
+      "inertia": 0.2,
+      "flicker_rate": 0.4883,
+      "response_latency": 0.66,
+      "stability": 0.6969,
+      "score": 48.92
+    },
+    {
+      "alpha_slow": 0.15,
+      "alpha_fast": 0.5,
+      "beta": 12.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.475,
+      "response_latency": 0.72,
+      "stability": 0.7021,
+      "score": 48.91
+    },
+    {
+      "alpha_slow": 0.2,
+      "alpha_fast": 0.5,
+      "beta": 8.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.474,
+      "response_latency": 0.73,
+      "stability": 0.7028,
+      "score": 48.91
+    },
+    {
+      "alpha_slow": 0.25,
+      "alpha_fast": 0.5,
+      "beta": 8.0,
+      "inertia": 0.1,
+      "flicker_rate": 0.4763,
+      "response_latency": 0.71,
+      "stability": 0.7016,
+      "score": 48.91
+    }
+  ]
+}

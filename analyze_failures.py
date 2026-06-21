@@ -1,8 +1,9 @@
 """分析1000组测试失败详情"""
+import os
 import json, sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-with open(r'D:\OpenClawData\.openclaw\workspace\emotion-engine\test_results_1000.json', 'r', encoding='utf-8') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_results_1000.json'), 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 # Boundary false positives

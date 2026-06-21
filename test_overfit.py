@@ -6,13 +6,14 @@ AutoEncoder 过拟合测试
 2. 生成从未见过的分布数据测试泛化能力
 3. 极端值/边界值测试
 """
+import os
 import sys, io, os, json, random, math
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import numpy as np
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
-MODEL_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\models"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
 
 # ============================================================
 # 加载模型和统计参数

@@ -1,7 +1,8 @@
 """逐个审查所有指标是否真正可用"""
+import os
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import psutil, time
 
 psutil.cpu_percent(interval=0)

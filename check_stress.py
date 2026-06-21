@@ -1,7 +1,8 @@
 """检查压力测试结果"""
+import os
 import json
 
-with open(r'D:\OpenClawData\.openclaw\workspace\emotion-engine\stress_10min_results.json', encoding='utf-8') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stress_10min_results.json'), encoding='utf-8') as f:
     data = json.load(f)
 
 print(f"Keys: {list(data.keys())[:10]}")

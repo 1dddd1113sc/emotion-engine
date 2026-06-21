@@ -1,16 +1,19 @@
 """V6 持续采集 — 后台运行，数据实时写 CSV"""
+import os
 import sys, time, csv, os, signal
 from datetime import datetime
 
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import psutil
 psutil.cpu_percent(interval=0)
 
 from real_collector import RealMetricCollector
 from body_sense import BodySenseManager
+from semantic_signals import extract_signals
+from context_pad import compute_pad_context_aware
 
 INTERVAL = 1.0  # 采集间隔（秒）
-CSV_PATH = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
+CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
 
 FIELDS = [
     'time','step',
@@ -27,6 +30,8 @@ FIELDS = [
     'error_rate','http_5xx','p99_ms','health_score',
     # L5
     'cpu_temp','gpu_temp','gpu_usage','gpu_mem_mb','thermal_stress','gpu_stress',
+    # Semantic Signals
+    'sig_error','sig_load','sig_latency','sig_health','sig_context',
     # Body
     'fatigue','tension','comfort','exhaustion',
 ]
@@ -83,6 +88,26 @@ try:
             swap_percent=r.swap_percent,
             mem_available_gb=r.mem_available_gb,
         )
+
+        # === 语义信号（代理值）===
+        # error 代理：网络错误率 + 进程崩溃检测
+        error_proxy = d.net_error_rate * 100  # 转为百分比
+        if d.process_count_delta < -3:
+            error_proxy = max(error_proxy, 5.0 + abs(d.process_count_delta))
+
+        # latency 代理：磁盘IO延迟（ms）
+        latency_proxy = d.disk_io_latency_ms
+        # 如果磁盘延迟为 0，用连接数/吞吐比估算拥塞
+        if latency_proxy < 0.01 and r.conn_total > 100:
+            if d.net_throughput_mbps > 0:
+                latency_proxy = r.conn_total / max(d.net_throughput_mbps, 0.01) * 0.1
+
+        sig = extract_signals(
+            cpu=r.cpu_percent, mem=r.mem_percent,
+            error_rate=error_proxy, latency_ms=latency_proxy,
+            swap_percent=r.swap_percent, disk_usage=r.disk_usage_c,
+        )
+
         step += 1
 
         row = {
@@ -109,10 +134,16 @@ try:
             'net_tp_mbps': round(d.net_throughput_mbps, 2),
             'net_err_rate': round(d.net_error_rate, 6),
             'disk_queue': r.disk_queue_depth if r.disk_queue_depth is not None else -1,
-            'error_rate': r.error_rate if r.error_rate is not None else -1,
+            'error_rate': round(error_proxy, 2),
             'http_5xx': r.http_5xx_rate if r.http_5xx_rate is not None else -1,
-            'p99_ms': r.response_p99_ms if r.response_p99_ms is not None else -1,
+            'p99_ms': round(latency_proxy, 2),
             'health_score': round(d.health_score, 3),
+            # 语义信号
+            'sig_error': round(sig.error, 3),
+            'sig_load': round(sig.load, 3),
+            'sig_latency': round(sig.latency, 3),
+            'sig_health': round(sig.health, 3),
+            'sig_context': sig.context,
             'cpu_temp': r.cpu_temp if r.cpu_temp is not None else -1,
             'gpu_temp': r.gpu_temp if r.gpu_temp is not None else -1,
             'gpu_usage': r.gpu_usage if r.gpu_usage is not None else -1,

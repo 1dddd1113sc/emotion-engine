@@ -9,6 +9,7 @@ L5 物理硬件层   → 终极 Fatigue
 
 采集源：psutil + WMI + nvidia-smi + Prometheus
 """
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -107,7 +108,7 @@ class DerivedMetrics:
 
     # L2 紧绷度
     close_wait_ratio: float = 0.0
-    listen_backlog: float = 0.0              # 监听积压比
+    conn_turnover_pressure: float = 0.0      # 连接周转压力 (TIME_WAIT/ESTABLISHED)
     thread_density: float = 0.0              # 线程密度（线程/进程比）
     conn_churn_rate: float = 0.0             # 连接变动率
 
@@ -120,14 +121,14 @@ class DerivedMetrics:
     disk_write_iops: float = 0.0             # 写IOPS
     net_throughput_mbps: float = 0.0
     net_error_rate: float = 0.0
-    io_congestion: float = 0.0
+    io_congestion: float = 0.0               # IO拥塞 (disk_queue_depth/8, 回退: disk_io_latency_ms/50)
 
     # L4 业务
-    process_crash_rate: float = 0.0          # 进程崩溃率（代理指标）
-    health_score: float = 1.0                # 综合健康分 [0,1]
+    system_health: float = 1.0               # 系统层健康分 [0,1] (永远有值)
+    business_health: float | None = None     # 业务层健康分 [0,1] (仅L4有数据时)
 
     # L5 物理
-    thermal_stress: float = 0.0              # 温度压力 [0,1]
+    thermal_stress: float = 0.0              # 温度压力 [0,1], 连续公式 min(1,(T-65)/35)
     gpu_stress: float = 0.0                  # GPU压力 [0,1]
 
     # 通用
@@ -161,6 +162,9 @@ class RealMetricCollector:
         self._gpu_cache: dict | None = None
         self._gpu_cache_time: float = 0
         self._gpu_cache_ttl: float = 2.0
+        # 线程数缓存（遍历进程很慢 ~3.7s）
+        self._thread_cache: int = 0
+        self._thread_cache_time: float = 0
         # L4 Prometheus 采集器
         self._l4 = None
         if l4_url:
@@ -272,9 +276,9 @@ class RealMetricCollector:
             raw.thread_count = psutil.os.sysconf('SC_THREAD_THREADS_MAX') if hasattr(psutil.os, 'sysconf') else 0
         except Exception:
             pass
-        # 线程数：缓存 10 秒（遍历进程很慢 ~3.7s）
+        # 线程数：缓存 10 秒
         now_ts = time.time()
-        if not hasattr(self, '_thread_cache') or now_ts - self._thread_cache_time > 10:
+        if now_ts - self._thread_cache_time > 10:
             try:
                 total_threads = 0
                 for p in psutil.process_iter(['num_threads']):
@@ -288,17 +292,24 @@ class RealMetricCollector:
             except Exception:
                 pass
         else:
-            raw.thread_count = self._thread_cache if hasattr(self, '_thread_cache') else 0
+            raw.thread_count = self._thread_cache
 
         # ===== L3 传导与IO层 =====
-        try:
-            raw.disk_usage_c = psutil.disk_usage('C:\\').percent
-        except Exception:
-            pass
-        try:
-            raw.disk_usage_d = psutil.disk_usage('D:\\').percent
-        except Exception:
-            pass
+        if sys.platform == 'win32':
+            try:
+                raw.disk_usage_c = psutil.disk_usage('C:\\').percent
+            except Exception:
+                pass
+            try:
+                raw.disk_usage_d = psutil.disk_usage('D:\\').percent
+            except Exception:
+                pass
+        else:
+            try:
+                raw.disk_usage_c = psutil.disk_usage('/').percent
+            except Exception:
+                pass
+            raw.disk_usage_d = 0.0
 
         dio = psutil.disk_io_counters()
         if dio:
@@ -372,7 +383,8 @@ class RealMetricCollector:
         total_cpu = raw.cpu_user + raw.cpu_system + raw.cpu_idle
         if total_cpu > 0:
             derived.iowait_ratio = raw.cpu_iowait / total_cpu
-        derived.mem_pressure = max(0, (raw.mem_percent - 60) / 40)
+        # mem_pressure: 用 available_gb 而非 mem_percent, 避免 Windows SysMain 误报
+        derived.mem_pressure = max(0, (4 - raw.mem_available_gb) / 4)
         derived.disk_pressure = max(0, (raw.disk_usage_c - 70) / 30)
         if raw.cpu_freq_ratio < 1.0:
             derived.freq_throttle = max(0, (1.0 - raw.cpu_freq_ratio) / 0.5)
@@ -382,8 +394,9 @@ class RealMetricCollector:
         # --- L2 紧绷度 ---
         if raw.conn_total > 0:
             derived.close_wait_ratio = raw.conn_close_wait / raw.conn_total
-        if raw.conn_total > 0:
-            derived.listen_backlog = raw.conn_listen / raw.conn_total
+        # 连接周转压力: TIME_WAIT/ESTABLISHED, 替代原来的 listen_backlog
+        if raw.conn_established > 0:
+            derived.conn_turnover_pressure = min(1.0, raw.conn_time_wait / raw.conn_established)
         if raw.process_count > 0:
             derived.thread_density = raw.thread_count / raw.process_count
 
@@ -438,9 +451,11 @@ class RealMetricCollector:
             net_errors = raw.net_errin + raw.net_errout + raw.net_dropin + raw.net_dropout
             derived.net_error_rate = net_errors / total_net
 
-        # IO 拥塞
-        if raw.disk_read_bytes > 0:
-            derived.io_congestion = raw.disk_write_bytes / max(raw.disk_read_bytes, 1)
+        # IO 拥塞: 优先用 disk_queue_depth, 回退到延迟比
+        if raw.disk_queue_depth is not None:
+            derived.io_congestion = min(1.0, raw.disk_queue_depth / 8)
+        elif derived.disk_io_latency_ms > 0:
+            derived.io_congestion = min(1.0, derived.disk_io_latency_ms / 50)
 
         # 核间方差
         if raw.cpu_per_core:
@@ -453,33 +468,29 @@ class RealMetricCollector:
             derived.interrupt_ratio = raw.cpu_interrupt / total_cpu_time
             derived.dpc_ratio = raw.cpu_dpc / total_cpu_time
 
-        # --- L4 业务：进程崩溃率（代理）---
-        if self._prev_raw and (now - self._prev_time) > 0:
-            dt = now - self._prev_time
-            delta = raw.process_count - self._prev_raw.process_count
-            # 进程数骤降可能是崩溃
-            if delta < -3:
-                derived.process_crash_rate = abs(delta) / dt
+        # --- L4 健康分（拆为 system_health + business_health）---
+        # system_health: 永远有值, 基于 CPU/IO/温度/内存
+        cpu_health = 1.0 - min(1.0, max(0, (raw.cpu_percent - 30) / 70))
+        io_health = 1.0 - min(1.0, max(0, (derived.disk_io_latency_ms - 5) / 45))
+        thermal_health = 1.0 - derived.thermal_stress
+        mem_health = 1.0 - derived.mem_pressure
+        derived.system_health = cpu_health * 0.35 + io_health * 0.15 + thermal_health * 0.20 + mem_health * 0.30
 
-        # 健康分
-        err = raw.error_rate if raw.error_rate is not None else 0
-        lat = raw.response_p99_ms if raw.response_p99_ms is not None else 0
-        err_health = 1.0 - min(1.0, err / 12.0) if err > 0 else 1.0
-        lat_health = 1.0 - max(0, min(1.0, (lat - 200) / 1800.0)) if lat > 0 else 1.0
-        derived.health_score = err_health * 0.7 + lat_health * 0.3
+        # business_health: 仅 L4 有数据时计算
+        has_l4 = raw.error_rate is not None or raw.response_p99_ms is not None
+        if has_l4:
+            err = raw.error_rate if raw.error_rate is not None else 0
+            lat = raw.response_p99_ms if raw.response_p99_ms is not None else 0
+            err_health = 1.0 - min(1.0, err / 12.0) if err > 0 else 1.0
+            lat_health = 1.0 - max(0, min(1.0, (lat - 200) / 1800.0)) if lat > 0 else 1.0
+            derived.business_health = err_health * 0.7 + lat_health * 0.3
 
-        # --- L5 物理：温度压力 ---
+        # --- L5 物理：温度压力（连续公式，无断崖）---
         if raw.cpu_temp is not None:
-            if raw.cpu_temp > 80:
-                derived.thermal_stress = min(1.0, (raw.cpu_temp - 80) / 20)
-            elif raw.cpu_temp > 65:
-                derived.thermal_stress = (raw.cpu_temp - 65) / 60
+            derived.thermal_stress = max(0, min(1.0, (raw.cpu_temp - 65) / 35))
         elif raw.gpu_temp is not None:
-            # 无 CPU 温度时用 GPU 温度代理
-            if raw.gpu_temp > 85:
-                derived.thermal_stress = min(1.0, (raw.gpu_temp - 85) / 15)
-            elif raw.gpu_temp > 70:
-                derived.thermal_stress = (raw.gpu_temp - 70) / 60
+            # 无 CPU 温度时用 GPU 温度代理 (GPU 阈值更高)
+            derived.thermal_stress = max(0, min(1.0, (raw.gpu_temp - 70) / 30))
 
         # GPU 压力
         if raw.gpu_usage is not None:
@@ -515,12 +526,13 @@ def format_metrics(raw: RawMetrics, derived: DerivedMetrics) -> str:
     return (
         f"L1: CPU={raw.cpu_percent:4.1f}% MEM={raw.mem_percent:4.1f}% "
         f"{freq} 过劳={derived.cpu_overwork:.2f} | "
-        f"L2: CONN={raw.conn_total}(CW={raw.conn_close_wait}) "
-        f"THR={raw.thread_count} 积压={derived.listen_backlog:.2f} | "
+        f"L2: CONN={raw.conn_total}(TW={raw.conn_time_wait}) "
+        f"THR={raw.thread_count} 周转={derived.conn_turnover_pressure:.2f} | "
         f"L3: {disk_lat} {dq} "
         f"IOPS={derived.disk_read_iops:.0f}/{derived.disk_write_iops:.0f} "
         f"吞吐={derived.disk_throughput_mbps:.1f}MB/s | "
-        f"L4: 健康={derived.health_score:.2f} | "
+        f"L4: 系统健康={derived.system_health:.2f}"
+        + (f" 业务健康={derived.business_health:.2f}" if derived.business_health is not None else "") + " | "
         f"L5: {gpu} 温压={derived.thermal_stress:.2f}"
     )
 

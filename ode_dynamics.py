@@ -272,70 +272,18 @@ def compute_target(
     """
     从当前指标计算目标情感状态（即"如果系统无记忆，此刻应该是什么情绪"）
 
-    这就是 PAD 映射函数的输出，作为 ODE 的"引力源"
+    V6.0: 委托给 pad_mapping.compute_pad_raw() 作为 PAD 基础计算，
+    消除了与 pad_model.metrics_to_pad() 的 ~80 行重复代码。
+    F/T/C 由外部体感模块（BodySenseManager）传入。
     """
+    from pad_mapping import compute_pad_raw
+
+    p, a, d = compute_pad_raw(cpu, mem, error_rate, latency_ms)
+
+    # V: 波动性
     import math
-
-    def tanh_norm(x, center, scale):
-        return math.tanh((x - center) / max(scale, 0.01))
-
-    err_n = tanh_norm(error_rate, 2.0, 8.0)
-    lat_n = tanh_norm(latency_ms, 100, 400)
-    cpu_n = tanh_norm(cpu, 30, 35)
-    mem_n = tanh_norm(mem, 50, 30)
-
-    # P：分段sigmoid
-    p = 1.0 - 0.45 * max(0, err_n) - 0.25 * max(0, lat_n)
-    # V4.1: 上调阈值，减少边界误报
-    if 6 < error_rate <= 12:
-        p -= 0.15 * (error_rate - 6) / 6.0
-    if 12 < error_rate <= 20:
-        p -= 0.25 * (error_rate - 12) / 8.0 * (1 + 0.5 * max(0, cpu_n))
-    if error_rate > 20:
-        p -= 0.4 * min(1, (error_rate - 20) / 20) ** 0.7
-    if error_rate > 6 and cpu > 60:
-        p -= 0.25 * min(1, (error_rate - 6) / 20 * (cpu - 60) / 30)
-    if error_rate > 15 and cpu < 30:
-        p -= 0.2 * min(1, (error_rate - 15) / 20)
-    p = p * 2 - 1
-
-    # A (V4.1: 上调错误阈值 + 内存压力)
-    a = (0.6 * cpu_n + 0.2 * mem_n + 0.2 * lat_n) * 0.8
-    if error_rate > 8:
-        a += 0.3 * min(1, (error_rate - 8) / 25)
-    # 内存泄漏检测：高内存独立贡献A
-    if mem > 80:
-        a += 0.4 * min(1.0, (mem - 80) / 15.0)
-    # 边界修正：中等CPU不应触发高A
-    health_a = 1.0 - min(1.0, max(0, error_rate) / 12.0) * 0.7 - max(0, min(1.0, (latency_ms - 200) / 1800.0)) * 0.3
-    if 45 < cpu < 65 and error_rate < 2 and latency_ms < 200 and health_a > 0.6:
-        boundary_factor = 1.0 - abs(cpu - 55) / 10.0
-        a -= 0.30 * max(0, boundary_factor)
-    a = max(-1, min(1, a))
-
-    # D：乘法衰减
-    # 健康感知 headroom（V4：降低健康系统的CPU惩罚）
-    health = 1.0 - min(1.0, max(0, error_rate) / 12.0) * 0.7 - max(0, min(1.0, (latency_ms - 200) / 1800.0)) * 0.3
-    cpu_weight = 0.6 - 0.2 * health  # [0.4, 0.6]
-    mem_weight = 1.0 - cpu_weight
-    headroom = 1 - (cpu / 100 * cpu_weight + mem / 100 * mem_weight)
-    # 内存泄漏检测：高内存单独惩罚（V4）
-    if mem > 75:
-        mem_pressure = (mem - 75) / 25.0
-        headroom -= 0.20 * mem_pressure
-    err_decay = math.exp(-0.06 * error_rate)
-    lat_decay = math.exp(-0.002 * max(0, latency_ms - 100))
-    err_erosion = max(0, err_n)
-    d = headroom * (1 - 0.7 * err_erosion) * err_decay * lat_decay
-    # 无错误高负载健康奖励（V4）
-    if error_rate < 2 and latency_ms < 500 and cpu > 50:
-        d += 0.35 * health * min(1.0, (cpu - 50) / 30.0)
-    # 健康感知缩放（V4：保留正值空间）
-    d_scale = 2.0 - 0.6 * health  # [1.4, 2.0]
-    d_offset = 1.0 - d_scale       # [-0.4, -1.0]
-    d = d * d_scale + d_offset
-
-    # V
+    cpu_n = math.tanh((cpu - 30) / 35.0)
+    err_n = math.tanh((error_rate - 2) / 8.0)
     v = min(1, abs(cpu_n) * 0.5 + max(0, err_n) * 0.5)
 
     return EmotionState(p=p, a=a, d=d, v=v, f=fatigue, t=tension, c=comfort).clamp()

@@ -5,12 +5,13 @@ Google Cluster Trace v2 (2019) 数据下载器
 数据地址：gs://clusterdata-2019/
 文档：https://github.com/google/cluster-data/blob/master/Documentation/Schema.md
 """
+import os
 import sys, io, os, csv, json, time, struct, gzip
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import urllib.request
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Google Cluster Data 2019 公开GCS地址

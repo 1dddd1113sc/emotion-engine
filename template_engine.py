@@ -130,8 +130,8 @@ def generate_expression(
     else:
         try:
             cpu_pct = max(0, min(100, int(30 + 35 * math.atanh(max(-0.99, min(0.99, pad.a / 0.8))))))
-        except:
-            cpu_pct = 30
+        except (ValueError, OverflowError):
+            cpu_pct = 30  # atanh 越界时回退
     if real_mem is not None:
         mem_pct = max(0, min(100, int(real_mem)))
     else:
@@ -162,25 +162,24 @@ class OutputThrottler:
     def __init__(self, interval_sec: float = 5.0):
         self.interval_sec = interval_sec
         self._last_quadrant: PADQuadrant | None = None
-        self._last_output_tick: float = 0
-        self._tick: float = 0
+        self._last_output_time: float = 0.0
 
     def should_output(self, quadrant: PADQuadrant, is_anomaly: bool = False) -> bool:
-        self._tick += 1
+        import time
+        now = time.monotonic()
         if is_anomaly:
             self._last_quadrant = quadrant
-            self._last_output_tick = self._tick
+            self._last_output_time = now
             return True
         if self._last_quadrant is not None and quadrant != self._last_quadrant:
             self._last_quadrant = quadrant
-            self._last_output_tick = self._tick
+            self._last_output_time = now
             return True
-        if self._tick - self._last_output_tick >= self.interval_sec:
-            self._last_output_tick = self._tick
+        if now - self._last_output_time >= self.interval_sec:
+            self._last_output_time = now
             return True
         return False
 
     def reset(self):
         self._last_quadrant = None
-        self._last_output_tick = 0
-        self._tick = 0
+        self._last_output_time = 0.0

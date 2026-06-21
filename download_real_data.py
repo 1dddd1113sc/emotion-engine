@@ -1,8 +1,9 @@
 """下载更多真实数据源"""
+import os
 import sys, io, os, gzip, csv, json, time, urllib.request
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-DATA_DIR = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data'
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 # ── 1. Google Cluster Data 2019 ──
 def download_google(part, max_rows=100000):

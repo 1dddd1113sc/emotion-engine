@@ -1,15 +1,16 @@
 """新架构完整管线：语义信号 → 上下文PAD → EMA → Stabilizer → ODE"""
+import os
 import sys, io, csv, json
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from context_pad import compute_pad_context_aware, PADOutput
 from ema_filter import AdaptiveEMAFilter
 from quadrant_stabilizer import QuadrantStabilizer
 from pad_model import PADState, MetricsHistory, metrics_to_pad
 
-LOCAL = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
-GOOGLE = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data\google_metrics_cache.json'
+LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
+GOOGLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/google_metrics_cache.json')
 
 with open(LOCAL, encoding='utf-8-sig') as f:
     local = [(float(r['cpu_pct']), float(r['mem_pct'])) for r in csv.DictReader(f)]

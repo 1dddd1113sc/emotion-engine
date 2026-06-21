@@ -1,0 +1,45 @@
+{
+  "test_time": "2026-06-18 15:16:42",
+  "duration_sec": 30,
+  "samples": 30,
+  "l1": {
+    "cpu_avg": 14.6,
+    "cpu_max": 19.2,
+    "mem_avg": 43.5,
+    "mem_max": 43.6,
+    "freq_throttle_avg": 0.0,
+    "overwork_avg": 0.0
+  },
+  "l2": {
+    "conn_avg": 166.0,
+    "conn_max": 173,
+    "cw_avg": 23.0,
+    "threads_avg": 4604.0
+  },
+  "l3": {
+    "io_latency_avg": 0.0,
+    "io_latency_max": 0.0,
+    "disk_tp_avg": 0.06,
+    "net_tp_avg": 0.01,
+    "disk_queue_avg": 0.0
+  },
+  "l4": {
+    "status": "no_service_running",
+    "note": "L4 needs a running HTTP service with /metrics endpoint"
+  },
+  "l5": {
+    "gpu_temp_avg": 38.0,
+    "gpu_temp_max": 38.0,
+    "gpu_usage_avg": 0.0,
+    "thermal_stress_avg": 0.0
+  },
+  "body_sense": {
+    "fatigue_avg": 0.349,
+    "fatigue_max": 0.352,
+    "tension_avg": 0.149,
+    "tension_max": 0.171,
+    "comfort_avg": 0.909,
+    "comfort_min": 0.909,
+    "exhaustion_avg": 0.052
+  }
+}

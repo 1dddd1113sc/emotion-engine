@@ -1,5 +1,5 @@
 """
-PAD 映射核心计算 — 共享模块 (V5.0)
+PAD 映射核心计算 — 共享模块 (V6.0)
 
 本模块从 pad_model.py 和 ode_dynamics.py 中提取的公共 PAD 计算逻辑。
 解决两个文件中 ~200 行重复代码的维护风险。
@@ -9,7 +9,7 @@ PAD 映射核心计算 — 共享模块 (V5.0)
 
 提取自: pad_model.py metrics_to_pad() + ode_dynamics.py compute_target()
 作者: 多AI协作 (DeepSeek + Qwen + GLM + 主模型整合)
-版本: V5.0
+版本: V6.0
 """
 import math
 from collections import deque

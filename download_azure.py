@@ -8,12 +8,13 @@ Azure VM Trace 数据下载器
 
 下载方式：从Azure Blob Storage下载
 """
+import os
 import sys, io, os, csv, json, time, gzip
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import urllib.request
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Azure VM Trace 2017 的公开数据

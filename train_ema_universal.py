@@ -1,20 +1,21 @@
 """EMA 通用参数训练 — 合并本机 + Google 数据"""
+import os
 import sys, io, csv, json, time, itertools
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pad_model import MetricsHistory, metrics_to_pad
 from ode_dynamics import ODEDynamics, ODEConfig
 from ema_filter import AdaptiveEMAFilter
 
 # 1. 本机数据
-LOCAL = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
+LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
 with open(LOCAL, encoding='utf-8-sig') as f:
     local_rows = list(csv.DictReader(f))
 local_data = [(float(r['cpu_pct']), float(r['mem_pct'])) for r in local_rows]
 
 # 2. Google 数据（抽样）
-GOOGLE = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data\google_metrics_cache.json'
+GOOGLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/google_metrics_cache.json')
 with open(GOOGLE) as f:
     google_raw = json.load(f)
 google_data = [(d['cpu_percent'], d['mem_percent']) for d in google_raw[::10]]  # 5000条

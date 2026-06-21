@@ -1,14 +1,15 @@
 """全量本机实时数据 — Stabilizer 参数调优"""
+import os
 import sys, io, csv, json, itertools
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pad_model import MetricsHistory, metrics_to_pad
 from ode_dynamics import ODEDynamics, ODEConfig
 from ema_filter import AdaptiveEMAFilter
 from quadrant_stabilizer import QuadrantStabilizer
 
-CSV = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
+CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
 with open(CSV, encoding='utf-8-sig') as f:
     rows = list(csv.DictReader(f))
 
@@ -23,9 +24,11 @@ def evaluate(data, dz, hyst, inertia):
     ode_cfg = ODEConfig(tau_p=60, tau_a=25, tau_d=40, noise_scale=0.008, dt=1.0)
     ema = AdaptiveEMAFilter(alpha_slow=0.35, alpha_fast=0.60, beta=12.0, inertia=0.20)
     history = MetricsHistory(window_size=10)
+    # V6.2: hysteresis 已移除，改用上下文自适应参数
     stab = QuadrantStabilizer(
         deadzone_p=dz, deadzone_a=dz, deadzone_d=dz,
-        hysteresis=hyst, inertia_window=inertia,
+        clean_dz=hyst, err_dz=dz,
+        clean_inertia=inertia * 2, err_inertia=inertia,
     )
     states = []
     for cpu, mem in data:

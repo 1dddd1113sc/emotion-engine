@@ -1,6 +1,6 @@
 """L4 代理端到端验证"""
 import sys, threading, time, urllib.request
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import random
 

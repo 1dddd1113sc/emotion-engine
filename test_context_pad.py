@@ -1,15 +1,16 @@
 """新架构验证：context_pad vs 旧 metrics_to_pad"""
+import os
 import sys, io, csv, json, time
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from semantic_signals import extract_signals
 from context_pad import compute_pad_context_aware, compose_pad
 from quadrant_stabilizer import QuadrantStabilizer
 
 # 加载数据
-LOCAL = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv'
-GOOGLE = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data\google_metrics_cache.json'
+LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
+GOOGLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/google_metrics_cache.json')
 
 with open(LOCAL, encoding='utf-8-sig') as f:
     local = [(float(r['cpu_pct']), float(r['mem_pct'])) for r in csv.DictReader(f)]

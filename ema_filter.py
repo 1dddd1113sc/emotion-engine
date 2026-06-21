@@ -1,14 +1,11 @@
 """
-自适应 EMA 滤波器 V5.0
+自适应 EMA 滤波器 V6.0
 
-DeepSeek：变化率大时快速响应
-GLM：加情绪惯性，让情绪有"回弹"感
-Qwen：保持平滑稳定性
-
-V5: 基于 Google Cluster Data 网格搜索训练最优参数
-    alpha_slow=0.10, alpha_fast=0.70, beta=12.0, inertia=0.20
-    训练结果: 闪烁率 6.6%, 响应延迟 1.8步, 稳定性 87.0%, 综合评分 81.9/100
-版本: V5.0
+V5: 变化率大时快速响应
+V6: 基于 Google Cluster Data 50K行 + 本机实时数据交叉验证
+    alpha_slow=0.35, alpha_fast=0.60, beta=12.0, inertia=0.20
+    训练结果: 加权闪烁率 1.43%（上下文自适应 Stabilizer 配合）
+版本: V6.0
 """
 import math
 from pad_model import PADState
@@ -22,8 +19,8 @@ class AdaptiveEMAFilter:
 
     def __init__(
         self,
-        alpha_slow: float = 0.10,
-        alpha_fast: float = 0.70,
+        alpha_slow: float = 0.35,
+        alpha_fast: float = 0.60,
         beta: float = 12.0,
         inertia: float = 0.2,
     ):

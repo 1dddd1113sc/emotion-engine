@@ -1,9 +1,10 @@
 """V6 五层感官 — 本机实测数据采集"""
+import os
 import sys, io, time, csv, json, os
 from datetime import datetime
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import psutil
 psutil.cpu_percent(interval=0)
@@ -13,7 +14,7 @@ from body_sense import BodySenseManager
 
 DURATION = 30  # 采集秒数
 INTERVAL = 1.0
-OUTPUT_DIR = r'D:\OpenClawData\.openclaw\workspace\emotion-engine'
+OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 print(f"V6 五层感官 - 本机实测 ({DURATION}s)")
 print("=" * 60)

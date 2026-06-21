@@ -1,20 +1,21 @@
 """全量真实数据 Stabilizer 效果验证"""
+import os
 import sys, io, csv, json
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pad_model import MetricsHistory, metrics_to_pad
 from ode_dynamics import ODEDynamics, ODEConfig
 from ema_filter import AdaptiveEMAFilter
 from quadrant_stabilizer import QuadrantStabilizer
 
-DATA_DIR = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data'
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 # 加载全部真实数据
 datasets = {}
 
 # 本机实时
-with open(r'D:\OpenClawData\.openclaw\workspace\emotion-engine\v6_live_data.csv', encoding='utf-8-sig') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv'), encoding='utf-8-sig') as f:
     datasets['Local'] = [(float(r['cpu_pct']), float(r['mem_pct'])) for r in csv.DictReader(f)]
 
 # Google 2019

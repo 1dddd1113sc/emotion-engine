@@ -8,13 +8,14 @@ Google Cluster Trace 数据下载器 + 预处理
 
 下载方式：从GitHub Release下载CSV子集
 """
+import os
 import sys, io, os, csv, json, math, time, struct
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import urllib.request
 import zipfile
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Google Cluster Trace 2019 的机器指标子集

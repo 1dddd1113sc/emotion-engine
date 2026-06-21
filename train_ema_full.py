@@ -1,14 +1,15 @@
 """EMA 完整训练 — 用本地缓存的 Google 真实数据"""
+import os
 import sys, io, json, time, itertools, math
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pad_model import PADState, MetricsHistory, metrics_to_pad
 from ode_dynamics import ODEDynamics, ODEConfig, compute_target
 from ema_filter import AdaptiveEMAFilter
 
 # 加载真实数据
-CACHE = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\data\google_metrics_cache.json'
+CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/google_metrics_cache.json')
 with open(CACHE) as f:
     raw = json.load(f)
 
@@ -166,7 +167,7 @@ output = {
     "best_metrics": {k: best[k] for k in ["flicker_rate", "response_latency", "stability", "score"]},
     "top_15": results[:15],
 }
-out_path = r'D:\OpenClawData\.openclaw\workspace\emotion-engine\ema_train_results.json'
+out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ema_train_results.json')
 with open(out_path, 'w') as f:
     json.dump(output, f, indent=2)
 print(f"\nSaved: {out_path}")

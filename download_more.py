@@ -1,10 +1,11 @@
 """检查 Google 数据并下载更多"""
+import os
 import json, os, sys, io, gzip, csv, time
 import urllib.request
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-DATA_DIR = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 CACHE_FILE = os.path.join(DATA_DIR, "google_metrics_cache.json")
 
 # 1. 检查现有缓存

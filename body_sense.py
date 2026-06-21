@@ -23,17 +23,30 @@ class BodySense:
 
 class FatigueTracker:
     """
-    疲劳度追踪器 — L1 计算与记忆 + L5 物理硬件
+    疲劳度追踪器 V6.2 — 双时间尺度
 
-    原理：指数衰减累积，τ=600s（10分钟半衰期）
+    τ_short=30s：短期负载响应（类似 tension，但聚焦 CPU/内存）
+    τ_long=600s：长期疲劳积累（真正的 Fatigue，缓慢上升/下降）
+    Fatigue = 0.7 × τ_long_long + 0.3 × τ_short
+
+    这样设计的好处：
+    - 短期 CPU 波动不会让 Fatigue 立刻饱和
+    - 长期高负载会让 Fatigue 缓慢但持续上升
+    - 恢复期 Fatigue 缓慢下降，模拟真实"休息恢复"
     """
 
-    def __init__(self, tau: float = 600.0):
-        self.tau = tau
+    def __init__(self, tau_short: float = 30.0, tau_long: float = 300.0):
+        self.tau_short = tau_short
+        self.tau_long = tau_long
+        self._fatigue_short = 0.0
+        self._fatigue_long = 0.0
         self._fatigue = 0.0
         self._last_time: float | None = None
         self._high_load_start: float | None = None
         self._high_load_duration: float = 0.0
+        # 输入平滑：对 load_signal 先做一次轻量 EMA，避免噪声
+        self._input_smooth = 0.0
+        self._tau_input: float = 5.0  # 5s 输入平滑窗口
 
     def update(self, load_signal: float, now: float | None = None) -> float:
         import time
@@ -42,15 +55,33 @@ class FatigueTracker:
 
         if self._last_time is None:
             self._last_time = now
-            self._fatigue = load_signal
+            self._input_smooth = load_signal
+            # 首次从 0 开始，不直接设为目标值
+            self._fatigue_short = 0.0
+            self._fatigue_long = 0.0
+            self._fatigue = 0.0
             return self._fatigue
 
-        dt = now - self._last_time
+        dt = max(0.001, now - self._last_time)  # 防止 dt=0 导致 alpha=0
         self._last_time = now
 
-        alpha = 1.0 - math.exp(-dt / self.tau)
-        self._fatigue = alpha * load_signal + (1 - alpha) * self._fatigue
+        # 输入平滑：先对 load_signal 做 5s EMA，避免噪声
+        alpha_in = 1.0 - math.exp(-dt / self._tau_input)
+        self._input_smooth = alpha_in * load_signal + (1 - alpha_in) * self._input_smooth
+        smoothed = self._input_smooth
 
+        # 短期 EMA（快速响应，跟踪短期负载变化）
+        alpha_short = 1.0 - math.exp(-dt / self.tau_short)
+        self._fatigue_short = alpha_short * smoothed + (1 - alpha_short) * self._fatigue_short
+
+        # 长期 EMA（缓慢积累，τ=300s~5分钟半衰期）
+        alpha_long = 1.0 - math.exp(-dt / self.tau_long)
+        self._fatigue_long = alpha_long * smoothed + (1 - alpha_long) * self._fatigue_long
+
+        # 混合输出：长期占主导，短期提供响应性
+        self._fatigue = 0.7 * self._fatigue_long + 0.3 * self._fatigue_short
+
+        # 高负载持续时间追踪
         if load_signal > 0.6:
             if self._high_load_start is None:
                 self._high_load_start = now
@@ -62,11 +93,21 @@ class FatigueTracker:
         return self._fatigue
 
     @property
+    def fatigue_short(self) -> float:
+        return self._fatigue_short
+
+    @property
+    def fatigue_long(self) -> float:
+        return self._fatigue_long
+
+    @property
     def duration_minutes(self) -> float:
         return self._high_load_duration / 60.0
 
     def reset(self):
         self._fatigue = 0.0
+        self._fatigue_short = 0.0
+        self._fatigue_long = 0.0
         self._last_time = None
         self._high_load_start = None
         self._high_load_duration = 0.0
@@ -138,9 +179,14 @@ class ComfortTracker:
         disk_usage: float = 0.0,
         swap_percent: float = 0.0,
         mem_available_gb: float = 32.0,
-        # L5 新增
-        thermal_stress: float = 0.0,
+        mem_percent: float = 0.0,
+        # L3 信号
         disk_io_latency_ms: float = 0.0,
+        sig_load: float = 0.0,
+        # L5 物理
+        thermal_stress: float = 0.0,
+        gpu_stress: float = 0.0,
+        gpu_temp: float | None = None,
     ) -> float:
         comfort = 1.0
 
@@ -156,14 +202,30 @@ class ComfortTracker:
         if mem_available_gb < 4:
             comfort -= 0.3 * (4 - mem_available_gb) / 4
 
+        # 内存使用率：>60%开始扣舒适度
+        if mem_percent > 60:
+            comfort -= 0.15 * min(1.0, (mem_percent - 60) / 40)
+
         # L5: 温度压力
         if thermal_stress > 0:
             comfort -= 0.3 * thermal_stress
 
+        # L5: GPU 温度波动（45°C以上开始扣，75°C扣满）
+        if gpu_temp is not None and gpu_temp > 45:
+            comfort -= 0.15 * min(1.0, (gpu_temp - 45) / 30)
+
+        # L5: GPU 压力
+        if gpu_stress > 0.5:
+            comfort -= 0.15 * min(1.0, (gpu_stress - 0.5) / 0.5)
+
         # L3: IO 延迟高 → 不舒服
-        if disk_io_latency_ms > 10:
-            io_penalty = min(1.0, (disk_io_latency_ms - 10) / 40)  # 10ms以下OK，50ms很难受
-            comfort -= 0.2 * io_penalty
+        if disk_io_latency_ms > 5:
+            io_penalty = min(1.0, (disk_io_latency_ms - 5) / 45)
+            comfort -= 0.15 * io_penalty
+
+        # L3: 信号负载高 → 不舒服
+        if sig_load > 0.3:
+            comfort -= 0.10 * min(1.0, (sig_load - 0.3) / 0.7)
 
         self._comfort = max(0.0, min(1.0, comfort))
         return self._comfort
@@ -189,7 +251,7 @@ class BodySenseManager:
     """
 
     def __init__(self):
-        self.fatigue = FatigueTracker(tau=600)
+        self.fatigue = FatigueTracker(tau_short=30, tau_long=300)
         self.tension = TensionTracker(window_size=10)
         self.comfort = ComfortTracker()
 
@@ -221,6 +283,9 @@ class BodySenseManager:
         disk_usage: float = 0.0,
         swap_percent: float = 0.0,
         mem_available_gb: float = 32.0,
+        mem_percent: float = 0.0,
+        sig_load: float = 0.0,
+        gpu_temp: float | None = None,
     ) -> BodySense:
 
         # ===== L1: 疲劳度信号 =====
@@ -279,8 +344,12 @@ class BodySenseManager:
             disk_usage=disk_usage,
             swap_percent=swap_percent,
             mem_available_gb=mem_available_gb,
-            thermal_stress=thermal_stress,
+            mem_percent=mem_percent,
             disk_io_latency_ms=disk_io_latency_ms,
+            sig_load=sig_load,
+            thermal_stress=thermal_stress,
+            gpu_stress=gpu_stress,
+            gpu_temp=gpu_temp,
         )
 
         exhaustion = f * t

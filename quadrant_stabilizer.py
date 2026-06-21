@@ -31,6 +31,7 @@ class QuadrantStabilizer:
         clean_inertia: int = 8,       # clean 时更高的惯性
         err_dz: float = 0.04,         # err 时缩小的死区
         err_inertia: int = 3,         # err 时的惯性
+        oscillation_suppress: float = 0.6,  # 震荡抑制强度 [0,1]
     ):
         self.deadzone = {'P': deadzone_p, 'A': deadzone_a, 'D': deadzone_d}
         self.inertia_window = inertia_window
@@ -39,6 +40,7 @@ class QuadrantStabilizer:
         self.clean_inertia = clean_inertia
         self.err_dz = err_dz
         self.err_inertia = err_inertia
+        self.oscillation_suppress = oscillation_suppress
 
         # 状态
         self.current_quadrant = None       # 当前稳定象限 (p_bit, a_bit, d_bit)
@@ -107,8 +109,7 @@ class QuadrantStabilizer:
                 self._update_baseline(P, A, D)
                 return P, A, D, candidate, True
 
-        # 未满足条件，锁定在当前象限
-        P, A, D = self._snap_to_quadrant(P, A, D)
+        # 未满足条件，仍输出平滑值但不改变象限
         return P, A, D, self.current_quadrant, False
 
     # ── 内部方法 ──
@@ -144,25 +145,26 @@ class QuadrantStabilizer:
 
             if reversals >= 3:
                 # 震荡中，向 baseline 靠拢
-                s = self.oscillation_suppress
-                result[dim] = s * self._baseline[dim] + (1 - s) * val
+                result[dim] = self.oscillation_suppress * self._baseline[dim] + (1 - self.oscillation_suppress) * val
             else:
                 result[dim] = val
 
         return result['P'], result['A'], result['D']
 
     def _snap_to_quadrant(self, P: float, A: float, D: float) -> tuple[float, float, float]:
-        """将接近 0 的值吸附到当前象限内侧"""
+        """将接近 0 的值吸附到当前象限内侧（仅用于显示，不影响切换判断）"""
         q = self.current_quadrant
+        if q is None:
+            return P, A, D
         dz = self.clean_dz if self._current_context == 'clean' else self.err_dz
         dims = [('P', P, q[0]), ('A', A, q[1]), ('D', D, q[2])]
         result = []
         for name, val, sign_bit in dims:
             target_sign = 1 if sign_bit else -1
             if target_sign > 0 and val < 0:
-                result.append(max(val, -dz))
+                result.append(max(val, -dz / 2))
             elif target_sign < 0 and val > 0:
-                result.append(min(val, dz))
+                result.append(min(val, dz / 2))
             else:
                 result.append(val)
         return tuple(result)
@@ -211,10 +213,19 @@ if __name__ == '__main__':
         P, A, D, q, t = stab.update(0.3 + n, 0.2, 0.1)
         print(f"  [{i}] P={P:+.3f} A={A:+.3f} D={D:+.3f} -> {q} transition={t}")
 
-    # 场景3：真实大幅变化 → 应该切换
-    print("\n=== 场景3：真实变化 ===")
+    # 场景3：真实大幅变化 → 应该切换（用 err 上下文快速切换）
+    print("\n=== 场景3：真实变化 (err 快速切换) ===")
     for i in range(5):
-        P, A, D, q, t = stab.update(-0.5, -0.3, -0.4)
+        P, A, D, q, t = stab.update(-0.5, -0.3, -0.4, context='err')
+        print(f"  [{i}] P={P:+.3f} A={A:+.3f} D={D:+.3f} -> {q} transition={t}")
+
+    # 场景3b：真实变化 clean 上下文 → 需要 8 步惯性
+    print("\n=== 场景3b：真实变化 (clean 长惯性) ===")
+    stab3 = QuadrantStabilizer()
+    for i in range(5):
+        stab3.update(0.3, 0.2, 0.1)
+    for i in range(10):
+        P, A, D, q, t = stab3.update(-0.5, -0.3, -0.4, context='clean')
         print(f"  [{i}] P={P:+.3f} A={A:+.3f} D={D:+.3f} -> {q} transition={t}")
 
     # 场景4：回来 → 需要惯性窗口确认

@@ -8,6 +8,7 @@
 - 矛盾指标（10%）
 - 极端值（10%）
 """
+import os
 import sys, io, random, time, json
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -250,7 +251,7 @@ def main():
                       f" → {r['state']} {r['plutchik']}")
 
     # 保存结果
-    out_path = r"D:\OpenClawData\.openclaw\workspace\emotion-engine\test_results_1000.json"
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_results_1000.json')
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     print(f"\n结果已保存: {out_path}")

@@ -1,5 +1,5 @@
 """
-EMA 参数网格搜索训练脚本 V5.0
+EMA 参数网格搜索训练脚本 V6.0
 
 用 Google Cluster Data 2011 的真实 CPU/Memory 数据作为输入，
 对 EMA 滤波器的 alpha_slow、alpha_fast、beta、inertia 四个参数进行网格搜索，

@@ -1,6 +1,7 @@
+import os
 import sys, io, time, psutil
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, r'D:\OpenClawData\.openclaw\workspace\emotion-engine')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 psutil.cpu_percent(interval=0)
 from real_collector import RealMetricCollector
 c = RealMetricCollector(interval=0.5)

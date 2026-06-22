@@ -198,7 +198,7 @@ class ODEKalmanFilter:
 
         # 过程噪声协方差 Q（自适应）
         Q = np.eye(4) * self.state.q_current
-        Q[0, 0] *= 10.0  # P 维度过程噪声放大
+        Q[0, 0] *= 3.0  # P 维度过程噪声放大
         P_pred = F @ self.state.P @ F.T + Q
 
         # ── 6. 修正步 ──

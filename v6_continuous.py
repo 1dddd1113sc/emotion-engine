@@ -10,10 +10,11 @@ psutil.cpu_percent(interval=0)
 from real_collector import RealMetricCollector
 from body_sense import BodySenseManager
 from semantic_signals import extract_signals
-from context_pad import compute_pad_context_aware
+from context_pad import compose_pad
+from ode_dynamics import ODEDynamics, ODEConfig, DEFAULT_ODE_CONFIG, EmotionState
 
 INTERVAL = 1.0  # 采集间隔（秒）
-CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'v6_live_data.csv')
+CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'date', 'p0_live_data_v8.csv')
 
 FIELDS = [
     'time','step',
@@ -32,6 +33,9 @@ FIELDS = [
     'cpu_temp','gpu_temp','gpu_usage','gpu_mem_mb','thermal_stress','gpu_stress',
     # Semantic Signals
     'sig_error','sig_load','sig_latency','sig_health','sig_context',
+    # PAD pipeline
+    'target_p','target_a','target_d','v_raw',
+    'p','a','d','v',
     # Body
     'fatigue','tension','comfort','exhaustion',
 ]
@@ -45,6 +49,7 @@ signal.signal(signal.SIGTERM, stop)
 
 collector = RealMetricCollector(interval=INTERVAL)
 mgr = BodySenseManager()
+ode = ODEDynamics(DEFAULT_ODE_CONFIG)
 
 # 预热
 time.sleep(0.5)
@@ -72,7 +77,7 @@ try:
             freq_throttle=d.freq_throttle,
             ctx_switches_rate=d.ctx_switches_rate,
             syscalls_rate=d.syscalls_rate,
-            listen_backlog=d.listen_backlog,
+            listen_backlog=d.conn_turnover_pressure,
             close_wait_ratio=d.close_wait_ratio,
             conn_churn_rate=d.conn_churn_rate,
             thread_density=d.thread_density,
@@ -108,6 +113,16 @@ try:
             swap_percent=r.swap_percent, disk_usage=r.disk_usage_c,
         )
 
+        # === PAD pipeline ===
+        pad_output = compose_pad(sig, body=body)
+
+        # ODE step
+        target = EmotionState(
+            p=pad_output.p, a=pad_output.a, d=pad_output.d, v=pad_output.v,
+            f=body.fatigue, t=body.tension, c=body.comfort,
+        ).clamp()
+        emo = ode.step(target)
+
         step += 1
 
         row = {
@@ -123,7 +138,7 @@ try:
             'conn_tw': r.conn_time_wait, 'conn_cw': r.conn_close_wait,
             'conn_listen': r.conn_listen, 'threads': r.thread_count,
             'close_wait_r': round(d.close_wait_ratio, 3),
-            'listen_backlog': round(d.listen_backlog, 3),
+            'listen_backlog': round(d.conn_turnover_pressure, 3),
             'thread_density': round(d.thread_density, 1),
             'disk_c_pct': r.disk_usage_c, 'disk_d_pct': r.disk_usage_d,
             'io_latency_ms': round(d.disk_io_latency_ms, 2),
@@ -137,13 +152,15 @@ try:
             'error_rate': round(error_proxy, 2),
             'http_5xx': r.http_5xx_rate if r.http_5xx_rate is not None else -1,
             'p99_ms': round(latency_proxy, 2),
-            'health_score': round(d.health_score, 3),
+            'health_score': round(d.system_health, 3),
             # 语义信号
             'sig_error': round(sig.error, 3),
             'sig_load': round(sig.load, 3),
             'sig_latency': round(sig.latency, 3),
             'sig_health': round(sig.health, 3),
             'sig_context': sig.context,
+            'target_p': round(pad_output.p, 4), 'target_a': round(pad_output.a, 4), 'target_d': round(pad_output.d, 4), 'v_raw': round(pad_output.v, 4),
+            'p': round(emo.p, 4), 'a': round(emo.a, 4), 'd': round(emo.d, 4), 'v': round(emo.v, 4),
             'cpu_temp': r.cpu_temp if r.cpu_temp is not None else -1,
             'gpu_temp': r.gpu_temp if r.gpu_temp is not None else -1,
             'gpu_usage': r.gpu_usage if r.gpu_usage is not None else -1,

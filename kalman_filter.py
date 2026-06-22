@@ -47,7 +47,7 @@ class KalmanConfig:
     nis_threshold_low: float = 0.5   # NIS < 此值 → 下调 Q
     q_adapt_rate: float = 0.1        # Q 自适应调整速率
     q_min: float = 1e-8
-    q_max: float = 0.01
+    q_max: float = 0.02
 
     # 数值稳定性
     eps: float = 1e-10
@@ -198,6 +198,7 @@ class ODEKalmanFilter:
 
         # 过程噪声协方差 Q（自适应）
         Q = np.eye(4) * self.state.q_current
+        Q[0, 0] *= 10.0  # P 维度过程噪声放大
         P_pred = F @ self.state.P @ F.T + Q
 
         # ── 6. 修正步 ──

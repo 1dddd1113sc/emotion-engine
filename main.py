@@ -1,11 +1,13 @@
 """
-情绪引擎 V6.2 — 完整管线入口 (BodySense + 上下文感知 PAD)
+情绪引擎 V6.4 — 完整管线入口 (BodySense + 上下文感知 PAD + Kalman)
 
 V6 四层管线：采集层 → BodySense → SemanticSignals → ContextPAD → EMA → Stabilizer → ODE → Plutchik
+          或：采集层 → BodySense → SemanticSignals → ContextPAD → Kalman → ODE → Plutchik (--kalman)
 
 用法:
   python main.py --fast                  # 快速完整演示（全部场景）
   python main.py --fast --scenario spike  # 只跑突发负载场景
+  python main.py --fast --kalman          # 使用 Kalman 滤波器替代 EMA+Stabilizer
   python main.py --benchmark             # 性能基准（V6 管线单步延迟）
   python main.py --flicker               # 闪烁测试（Stabilizer inertia）
   python main.py --hz 2                  # 2Hz 采样
@@ -25,6 +27,7 @@ from context_pad import compose_pad
 from ema_filter import AdaptiveEMAFilter
 from quadrant_stabilizer import QuadrantStabilizer
 from ode_dynamics import ODEDynamics, ODEConfig, DEFAULT_ODE_CONFIG, EmotionState
+from kalman_filter import ODEKalmanFilter
 from plutchik import classify_plutchik, format_plutchik
 from template_engine import generate_expression, OutputThrottler
 from system_simulator import SystemSimulator
@@ -144,11 +147,13 @@ def run_v6_pipeline_step(
     stabilizer: QuadrantStabilizer, ode: ODEDynamics,
     throttler: OutputThrottler, anomaly,
     verbose: bool, fast: bool,
+    kf: ODEKalmanFilter = None,
 ) -> dict:
     """
     V6 管线单步执行。
 
     流程：指标 → BodySense → SemanticSignals → ContextPAD → EMA → Stabilizer → ODE → Plutchik
+          或：指标 → BodySense → SemanticSignals → ContextPAD → Kalman → ODE → Plutchik (kf 非 None)
     返回：包含所有中间结果的字典
     """
     # ── 1. 体感更新（BodySenseManager）──
@@ -177,14 +182,37 @@ def run_v6_pipeline_step(
     if anomaly.override_pad:
         ema.force_update(anomaly.override_pad)
         smooth_pad = anomaly.override_pad
+        use_kalman_override = False
+    elif kf is not None:
+        # ── 5a. Kalman 滤波（替代 EMA + Stabilizer）──
+        # Kalman 内部包含 ODE 动力学 + V→A 耦合，同时做平滑和预测
+        kf_out = kf.step(
+            (pad_output.p, pad_output.a, pad_output.d, pad_output.v),
+            tension=body_sense.tension,
+            fatigue=body_sense.fatigue,
+            comfort=body_sense.comfort,
+        )
+        # Kalman 输出作为平滑后的 PAD
+        smooth_pad = PADState(
+            p=kf_out.p, a=kf_out.a, d=kf_out.d, volatility=kf_out.v,
+        ).clamp()
+        use_kalman_override = True
     else:
         # ── 5. 自适应 EMA 平滑 ──
         smooth_pad = ema.update(raw_pad)
+        use_kalman_override = False
 
-    # ── 6. 防闪烁象限稳定器 ──
-    p_s, a_s, d_s, quadrant, is_transition = stabilizer.update(
-        smooth_pad.p, smooth_pad.a, smooth_pad.d, context=sig.context,
-    )
+    if kf is not None:
+        # Kalman 模式：跳过象限稳定器（Kalman 已做平滑）
+        # quadrant 由 PADState 自动计算
+        p_s, a_s, d_s = smooth_pad.p, smooth_pad.a, smooth_pad.d
+        quadrant = None  # 占位，PADState 会自己算
+        is_transition = False
+    else:
+        # ── 6. 防闪烁象限稳定器 ──
+        p_s, a_s, d_s, quadrant, is_transition = stabilizer.update(
+            smooth_pad.p, smooth_pad.a, smooth_pad.d, context=sig.context,
+        )
     stable_pad = PADState(p=p_s, a=a_s, d=d_s, volatility=smooth_pad.volatility)
 
     # ── 7. ODE 动力系统步进 ──
@@ -251,7 +279,7 @@ def run_v6_pipeline_step(
     }
 
 
-def run_scenario(sim, scenario, steps, hz, verbose=True, fast=False, alpha=0.3):
+def run_scenario(sim, scenario, steps, hz, verbose=True, fast=False, alpha=0.3, use_kalman=False):
     """场景模式：用 SystemSimulator 生成模拟数据，经 V6 管线处理"""
     sim.set_scenario(scenario)
 
@@ -261,6 +289,7 @@ def run_scenario(sim, scenario, steps, hz, verbose=True, fast=False, alpha=0.3):
     body = BodySenseManager()
     stabilizer = QuadrantStabilizer()
     ode = ODEDynamics(DEFAULT_ODE_CONFIG)
+    kf = ODEKalmanFilter() if use_kalman else None
     throttler = OutputThrottler(interval_sec=5)
     interval = 1.0 / hz
 
@@ -297,6 +326,7 @@ def run_scenario(sim, scenario, steps, hz, verbose=True, fast=False, alpha=0.3):
             metrics_dict, history,
             body, ema, stabilizer, ode, throttler, anomaly,
             verbose, fast,
+            kf=kf,
         )
 
         q_name = result["quadrant"]
@@ -493,6 +523,7 @@ def run_realtime(hz, alpha, fast, quiet):
     body = BodySenseManager()
     stabilizer = QuadrantStabilizer()
     ode = ODEDynamics(DEFAULT_ODE_CONFIG)
+    kf = ODEKalmanFilter() if use_kalman else None
     throttler = OutputThrottler(interval_sec=5)
 
     step = 0
@@ -563,10 +594,14 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="静默模式")
     parser.add_argument("--fast", action="store_true", help="快速模式（无延迟）")
     parser.add_argument("--alpha", type=float, default=0.3, help="EMA alpha 参数（兼容旧接口）")
+    parser.add_argument("--kalman", action="store_true", help="使用 Kalman 滤波器替代 EMA+Stabilizer")
     args = parser.parse_args()
 
-    print("🧠 情绪引擎 V6.2 — BodySense + 上下文感知 PAD")
-    print(f"   管线: 采集 → BodySense → SemanticSig → ContextPAD → EMA → Stabilizer → ODE → Plutchik")
+    print("🧠 情绪引擎 V6.4 — BodySense + 上下文感知 PAD + Kalman")
+    if args.kalman:
+        print(f"   管线: 采集 → BodySense → SemanticSig → ContextPAD → Kalman → ODE → Plutchik")
+    else:
+        print(f"   管线: 采集 → BodySense → SemanticSig → ContextPAD → EMA → Stabilizer → ODE → Plutchik")
     print(f"   采样: {args.hz} Hz | 间隔: {1000/args.hz:.0f} ms")
 
     # ── 基准模式 ──
@@ -590,7 +625,8 @@ def main():
         sim = SystemSimulator(seed=42)
         print(f"\n{desc}")
         run_scenario(sim, name, steps, args.hz,
-                     verbose=not args.quiet, fast=args.fast, alpha=args.alpha)
+                     verbose=not args.quiet, fast=args.fast, alpha=args.alpha,
+                     use_kalman=args.kalman)
         return
 
     # ── 无 --scenario：全部场景依次运行 ──
